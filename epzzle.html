@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>8 Puzzle Solver with A*</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      text-align: center;
+      padding: 20px;
+      background: #f0f8ff;
+    }
+    h1 {
+      color: #2c3e50;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 100px);
+      gap: 10px;
+      justify-content: center;
+      margin-top: 20px;
+    }
+    .tile {
+      width: 100px;
+      height: 100px;
+      background: #ffffff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 28px;
+      font-weight: bold;
+      border: 2px solid #3498db;
+      border-radius: 12px;
+      box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
+    }
+    .empty {
+      background: #ecf0f1;
+      border: 2px dashed #bdc3c7;
+    }
+    input[type="number"] {
+      width: 60px;
+      height: 40px;
+      font-size: 20px;
+      text-align: center;
+      margin: 5px;
+      border-radius: 6px;
+      border: 1px solid #7f8c8d;
+    }
+    .controls {
+      margin-top: 20px;
+    }
+    button {
+      background: #3498db;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      font-size: 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+    }
+    button:hover {
+      background: #2980b9;
+    }
+    #sequence {
+      margin-top: 30px;
+      white-space: pre-wrap;
+      color: #2c3e50;
+      font-size: 18px;
+    }
+    #message {
+      margin-top: 20px;
+      font-size: 18px;
+      color: #e74c3c;
+    }
+  </style>
+</head>
+<body>
+  <h1>8 Puzzle AI Solver (A* Algorithm)</h1>
+  <p>Enter the initial puzzle state (use 0 for empty tile):</p>
+  <div id="inputs">
+    <input type="number" id="tile0" min="0" max="8">
+    <input type="number" id="tile1" min="0" max="8">
+    <input type="number" id="tile2" min="0" max="8"><br>
+    <input type="number" id="tile3" min="0" max="8">
+    <input type="number" id="tile4" min="0" max="8">
+    <input type="number" id="tile5" min="0" max="8"><br>
+    <input type="number" id="tile6" min="0" max="8">
+    <input type="number" id="tile7" min="0" max="8">
+    <input type="number" id="tile8" min="0" max="8">
+  </div>
+  <div class="controls">
+    <button onclick="solvePuzzle()">Solve</button>
+  </div>
+  <div class="grid" id="grid"></div>
+  <div id="sequence"></div>
+  <div id="message"></div>
+
+  <script>
+    const goalState = "123456780";
+
+    function createGrid(state) {
+      const grid = document.getElementById("grid");
+      grid.innerHTML = "";
+      state.split("").forEach(val => {
+        const div = document.createElement("div");
+        div.className = "tile";
+        if (val === "0") div.classList.add("empty");
+        div.textContent = val === "0" ? "" : val;
+        grid.appendChild(div);
+      });
+    }
+
+    function getInputState() {
+      let state = "";
+      for (let i = 0; i < 9; i++) {
+        const val = document.getElementById(`tile${i}`).value;
+        state += val || "0";
+      }
+      return state;
+    }
+
+    function hasDuplicates(state) {
+      const digits = state.split("");
+      const seen = new Set();
+      for (let digit of digits) {
+        if (seen.has(digit)) return true;
+        seen.add(digit);
+      }
+      return false;
+    }
+
+    function isSolvable(puzzle) {
+      let inv = 0;
+      for (let i = 0; i < 9; i++) {
+        for (let j = i + 1; j < 9; j++) {
+          if (puzzle[i] !== "0" && puzzle[j] !== "0" && puzzle[i] > puzzle[j]) inv++;
+        }
+      }
+      return inv % 2 === 0;
+    }
+
+    function manhattan(state) {
+      let dist = 0;
+      for (let i = 0; i < state.length; i++) {
+        if (state[i] === '0') continue;
+        const val = parseInt(state[i]) - 1;
+        const x1 = Math.floor(i / 3), y1 = i % 3;
+        const x2 = Math.floor(val / 3), y2 = val % 3;
+        dist += Math.abs(x1 - x2) + Math.abs(y1 - y2);
+      }
+      return dist;
+    }
+
+    function solvePuzzle() {
+      const message = document.getElementById("message");
+      message.textContent = "";
+      document.getElementById("sequence").textContent = "";
+
+      const startState = getInputState();
+
+      if (hasDuplicates(startState)) {
+        message.textContent = "⚠️ Duplicate numbers found! Please ensure each number from 0 to 8 appears exactly once.";
+        return;
+      }
+
+      if (!isSolvable(startState)) {
+        message.textContent = "⚠️ The puzzle is not solvable. Please try a different configuration.";
+        return;
+      }
+
+      const pq = [];
+      pq.push({
+        state: startState,
+        path: [],
+        moves: [],
+        cost: 0,
+        estimate: manhattan(startState)
+      });
+
+      const visited = new Set();
+
+      const directions = [
+        [-1, 0, -3, 'Top'],
+        [1, 0, 3, 'Down'],
+        [0, -1, -1, 'Left'],
+        [0, 1, 1, 'Right']
+      ];
+
+      while (pq.length > 0) {
+        pq.sort((a, b) => (a.cost + a.estimate) - (b.cost + b.estimate));
+        const current = pq.shift();
+
+        if (current.state === goalState) {
+          document.getElementById("sequence").textContent =
+            "Sequence of Moves:\n" + current.moves.join(" -> ") + `\nTotal Moves: ${current.moves.length}`;
+          animatePath([startState, ...current.path]);
+          return;
+        }
+
+        if (visited.has(current.state)) continue;
+        visited.add(current.state);
+
+        const zeroIndex = current.state.indexOf("0");
+        const x = Math.floor(zeroIndex / 3);
+        const y = zeroIndex % 3;
+
+        for (let [dx, dy, offset, name] of directions) {
+          const newX = x + dx;
+          const newY = y + dy;
+          if (newX >= 0 && newX < 3 && newY >= 0 && newY < 3) {
+            const newIndex = newX * 3 + newY;
+            const stateArr = current.state.split("");
+            [stateArr[zeroIndex], stateArr[newIndex]] = [stateArr[newIndex], stateArr[zeroIndex]];
+            const newState = stateArr.join("");
+            if (!visited.has(newState)) {
+              pq.push({
+                state: newState,
+                path: [...current.path, newState],
+                moves: [...current.moves, name],
+                cost: current.cost + 1,
+                estimate: manhattan(newState)
+              });
+            }
+          }
+        }
+      }
+
+      message.textContent = "❌ No solution found.";
+    }
+
+    function animatePath(path) {
+      let i = 0;
+      const interval = setInterval(() => {
+        if (i >= path.length) {
+          clearInterval(interval);
+          return;
+        }
+        createGrid(path[i]);
+        i++;
+      }, 1000);
+    }
+  </script>
+</body>
+</html>
