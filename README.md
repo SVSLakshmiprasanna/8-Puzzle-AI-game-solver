@@ -41,7 +41,8 @@ In this project, common heuristics like **Manhattan Distance** or **Misplaced Ti
 ├── epzzle.html
 └── README.md       # Documentation
 ```
-
+## 😎 This is how it looks:
+ [View the 8 Puzzle Solver in action](https://rawcdn.githack.com/SVSLakshmiprasanna/8-Puzzle-AI-game-solver/refs/heads/main/epzzle.html)
 ---
 
 ## ⚡ How to Run
